@@ -17,4 +17,6 @@ public class AuthenticatedUser {
 	public void setUser(User user) {
 		this.user = user;
 	}
+
+
 }
