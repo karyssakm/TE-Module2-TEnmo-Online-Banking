@@ -68,4 +68,7 @@ public class Transfer {
     public BigDecimal getAmount() {
         return amount;
     }
+
+
+
 }

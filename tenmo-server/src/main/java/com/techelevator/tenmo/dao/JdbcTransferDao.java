@@ -1,19 +1,20 @@
 package com.techelevator.tenmo.dao;
 
 import com.techelevator.tenmo.exception.DaoException;
-import com.techelevator.tenmo.model.Account;
 import com.techelevator.tenmo.model.Transfer;
+import com.techelevator.tenmo.model.TransferDto;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class JdbcTransferDao {
+public class JdbcTransferDao implements TransferDao {
     private final JdbcTemplate jdbcTemplate;
 
 
@@ -21,8 +22,8 @@ public class JdbcTransferDao {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @Override
-    public List<Transfer> getAllTransfers() {
+    @Override    //getAllTransfers
+    public List<Transfer> getAllPastTransfers() {
         List<Transfer> transfers = new ArrayList<>();
         String sql = "SELECT * FROM transfer;";
         try {
@@ -36,6 +37,105 @@ public class JdbcTransferDao {
         }
         return transfers;
     }
+    @Override
+    public List<Transfer> getAllPendingRequests() {
+        List<Transfer> pendingRequests = new ArrayList<>();
+        String sql = "SELECT *" +
+                "FROM transfer_status ts" +
+                "JOIN transfer t ON ts.transfer_status  = ts.transfer_status" +
+                "WHERE transfer_status = = ?";
+        try {
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql);
+            while (results.next()) {
+                Transfer transfer = mapRowToTransfer(results);
+//                TransferStatus.setTransferStatus(new TransferStatus(
+//                        results.getInt("transfer_status_id"),
+//                        results.getString("transfer_status_desc")
+//                ));
+                pendingRequests.add(transfer);
+            }
+        } catch (DataAccessException e) {
+            throw new DaoException("Error retrieving pending  requests", e);
+        }
+        return pendingRequests;
+    }
+
+//
+//    @Override
+//    public Transfer sendBucks(int accountFrom, int accountTo, BigDecimal amount) {
+//        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
+//                "VALUES (?, ?, ?, ?, ?)";
+//        try {
+//            // Assuming transfer type for SEND is 1 and transfer status for PENDING is 1 (you may adjust based on your schema)
+//            jdbcTemplate.update(sql, TransferStatus.TRANSFER_STATUS_PENDING, accountFrom, accountTo, amount);
+//
+//        } catch (DataAccessException e) {
+//            throw new DaoException("Error sending TE Bucks", e);
+//        }
+//        return
+//    }
+
+    @Override
+    public Transfer sendBucks(TransferDto transferDto) {
+        // this is so we make sure the we will not send money to our selfs
+        if (transferDto.getUserFrom() == transferDto.getUserTo()) {
+            throw new IllegalArgumentException("Cannot send money to yourself");
+        }
+
+        // we have to make sure that we have enough money
+//        BigDecimal senderBalance = getBalanceByUserId(transferDto.getUserFrom());
+//        if (senderBalance.compareTo(transferDto.getAmount()) < 0) {
+//            throw new IllegalArgumentException("Insufficient balance");
+//        }
+
+
+        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
+                "VALUES (?, ?, ?, ?, ?)";
+        try {
+            jdbcTemplate.update(sql, transferDto.getUserFrom(), transferDto.getUserTo(), transferDto.getAmount());
+
+//            //  this is for when we make sure to subtract from amount
+//            updateBalance(transferDto.getUserFrom(), senderBalance.subtract(transferDto.getAmount()));
+//
+//            //  this is to add to the balance
+//            BigDecimal receiverBalance = getBalanceByUserId(transferDto.getUserTo());
+//            updateBalance(transferDto.getUserTo(), receiverBalance.add(transferDto.getAmount()));
+
+            // this is what gets and returns the newly created transfer
+            int transferId = jdbcTemplate.queryForObject(sql,Integer.class);
+            return getTransferByTransferId(transferId);
+        } catch (DataAccessException e) {
+            throw new DaoException("Error sending TE Bucks", e);
+        }
+    }
+
+//    private void updateBalance(int userId, BigDecimal newBalance) {
+//        String sql = "UPDATE account SET balance = ? WHERE user_id = ?";
+//        jdbcTemplate.update(sql, newBalance, userId);
+//    }
+
+   
+
+
+
+
+
+
+    @Override
+    public Transfer requestBucks(int accountFrom) {
+        return null;
+    }
+
+    @Override
+    public Transfer createTransfer(int transferId) {
+        return null;
+    }
+
+//    @Override
+//    public Transfer updateTransfer() {
+//        return null;
+//    }
+
 
     @Override
     public Transfer getTransferByTransferId(int transferId) {
