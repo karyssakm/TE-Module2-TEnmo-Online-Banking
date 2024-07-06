@@ -2,9 +2,7 @@ package com.techelevator.tenmo.dao;
 
 import com.techelevator.tenmo.model.Transfer;
 import com.techelevator.tenmo.model.TransferDto;
-import com.techelevator.tenmo.model.User;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 public interface TransferDao {
@@ -17,7 +15,7 @@ public interface TransferDao {
 
     Transfer requestBucks(int accountFrom);
 
-    Transfer createTransfer(int transferId);
+    Transfer createTransfer(Transfer transferId);
 
     void save(Transfer transfer);
 

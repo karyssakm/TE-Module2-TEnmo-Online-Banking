@@ -14,6 +14,12 @@ public interface AccountDao {
     Account getAccountByUserId(int userId);
     BigDecimal getBalanceByUserId(int userId);
 
+    boolean existsById(int accountId);
+
+    void update(Account account);
+
+    void updateBalance(int accountId, BigDecimal amount);
+
 }
 
 

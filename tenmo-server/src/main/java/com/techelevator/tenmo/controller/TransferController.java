@@ -63,7 +63,7 @@ public class TransferController {
     @RequestMapping(path = "", method = RequestMethod.POST)
     public Transfer createTransfer(@Valid @RequestBody TransferDto transferDto, Principal principal) {
         Transfer transfer = buildTransferFromTransferDTO(transferDto);
-        validateAuthorizationToCreate(principal, transfer);
+//        validateAuthorizationToCreate(principal, transfer);
         if (transfer.getTransferStatusId() == 2) {          //2 is approved
             transferBucksBetweenAccounts(transfer);     //add in method here to transfer between accounts
         }
@@ -72,6 +72,25 @@ public class TransferController {
         } catch (DaoException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private void transferBucksBetweenAccounts(Transfer transfer) {
+        Account fromAccount = accountDao.getAccountById(transfer.getAccountFrom());
+        Account toAccount = accountDao.getAccountById(transfer.getAccountTo());
+
+        if (fromAccount == null || toAccount == null) {
+            throw new RuntimeException("One or both accounts do not exist");
+        }
+
+        if (fromAccount.getBalance().compareTo(transfer.getAmount()) < 0) {
+            throw new RuntimeException("Insufficient balance");
+        }
+
+        fromAccount.setBalance(fromAccount.getBalance().subtract(transfer.getAmount()));
+        toAccount.setBalance(toAccount.getBalance().add(transfer.getAmount()));
+
+        accountDao.update(fromAccount);
+        accountDao.update(toAccount);
     }
 
     private Transfer buildTransferFromTransferDTO(TransferDto transferDto) {
@@ -92,20 +111,20 @@ public class TransferController {
         return transfer;
     }
 
-    private void validateAuthorizationToCreate(Principal principal, Transfer transfer) {
-        String username = principal.getName();
-        Account fromAccount = accountDao.findByAccountId(transfer.getAccountFrom());
-        if (fromAccount == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "From account does not exist.");
-        }
-
-        int ownerId = fromAccount.getUserId();
-        User user = userDao.getUserByUsername(username);
-
-        if (user == null || user.getId() != ownerId) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot create this transfer.");
-        }
-    }
+//    private void validateAuthorizationToCreate(Principal principal, Transfer transfer) {
+//        String username = principal.getName();
+//        Account fromAccount = accountDao.existsById(transfer.getAccountFrom());
+//        if (fromAccount == null) {
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "From account does not exist.");
+//        }
+//
+//        int ownerId = fromAccount.getUserId();
+//        User user = userDao.getUserByUsername(username);
+//
+//        if (user == null || user.getId() != ownerId) {
+//            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot create this transfer.");
+//        }
+//    }
 
 
 

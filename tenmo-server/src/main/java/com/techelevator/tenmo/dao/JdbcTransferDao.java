@@ -9,7 +9,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -128,22 +127,22 @@ public class JdbcTransferDao implements TransferDao {
     }
 
     @Override
-    public Transfer createTransfer(int transferId) {
+    public Transfer createTransfer(Transfer transferId) {
         String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, " +
                 "account_from, account_to, amount) VALUES (?, ?, ?, ?, ?) RETURNING transfer_id;";
         try {
             int newTransferId = jdbcTemplate.queryForObject(sql, new Object[] {
-                    transfer.getTransferTypeId(),
-                    transfer.getTransferStatusId(),
-                    transfer.getAccountFrom(),
-                    transfer.getAccountTo(),
-                    transfer.getAmount()
+                    transferId.getTransferTypeId(),
+                    transferId.getTransferStatusId(),
+                    transferId.getAccountFrom(),
+                    transferId.getAccountTo(),
+                    transferId.getAmount()
             }, Integer.class);
-            transfer.setTransferId(newTransferId);
+            transferId.setTransferId(newTransferId);
         } catch (CannotGetJdbcConnectionException e) {
             throw new DaoException("Unable to connect to server or database", e);
         }
-        return transfer;
+        return transferId;
     }
 
 //    @Override

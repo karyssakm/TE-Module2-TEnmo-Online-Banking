@@ -83,6 +83,27 @@ public class JdbcAccountDao implements AccountDao {
         }
     }
 
+    @Override
+    public boolean existsById(int accountId) {
+        String sql = "SELECT COUNT(*) FROM account WHERE account_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, accountId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public void update(Account account) {
+        String sql = "UPDATE account SET balance = ? WHERE account_id = ?";
+        jdbcTemplate.update(sql, account.getBalance(), account.getAccountId());
+    }
+
+
+    //not going to correctly update
+    @Override
+    public void updateBalance(int accountId, BigDecimal amount) {
+        String sql = "UPDATE account SET balance = balance + ? WHERE account_id = ?";
+        jdbcTemplate.update(sql, amount, accountId);
+    }
+
     private Account mapRowToAccount(SqlRowSet rs) {
         Account account = new Account();
         account.setAccountId(rs.getInt("account_id"));
