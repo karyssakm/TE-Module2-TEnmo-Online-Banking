@@ -60,7 +60,7 @@ public class TransferController {
 
 
     @ResponseStatus(HttpStatus.CREATED)
-    @RequestMapping(path = "", method = RequestMethod.POST)
+    @RequestMapping(path = "/transfer/create", method = RequestMethod.POST)
     public Transfer createTransfer(@Valid @RequestBody TransferDto transferDto, Principal principal) {
         Transfer transfer = buildTransferFromTransferDTO(transferDto);
 //        validateAuthorizationToCreate(principal, transfer);
