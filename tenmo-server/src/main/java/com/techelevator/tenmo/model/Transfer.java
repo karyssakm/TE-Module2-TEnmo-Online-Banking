@@ -19,7 +19,14 @@ public class Transfer {
         this.accountTo = accountTo;
         this.amount =amount;
     }
+
+    public boolean isApproved() {
+        return transferStatusId == 2; // 2 is approved
+    }
+
     public Transfer() { }
+
+
 
     public int getTransferId() {
         return transferId;

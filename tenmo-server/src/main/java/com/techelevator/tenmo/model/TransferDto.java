@@ -5,9 +5,10 @@ import javax.validation.constraints.NotEmpty;
 import java.math.BigDecimal;
 
 public class TransferDto {
-    private int userFrom;
-    private int userTo;
-    private int userId;
+
+    private int accountFrom;
+    private int accountTo;
+    private String type;
 
     @DecimalMin(value = "0.01", inclusive = false)
     private BigDecimal amount;
@@ -15,31 +16,36 @@ public class TransferDto {
 //    @NotEmpty
 //    private String transferFrom;
 
-    public int getUserFrom(){
-        return userFrom;
-    }
-    public void setUserFrom(int userFrom){
-        this.userFrom= userFrom;
+
+    public int getAccountFrom() {
+        return accountFrom;
     }
 
-    public int getUserTo() {
-        return userTo;
+    public void setAccountFrom(int accountFrom) {
+        this.accountFrom = accountFrom;
     }
 
-    public void setUserTo(int userTo) {
-        this.userTo = userTo;
+    public int getAccountTo() {
+        return accountTo;
     }
+
+    public void setAccountTo(int accountTo) {
+        this.accountTo = accountTo;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
     public BigDecimal getAmount() {
         return amount;
     }
 
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
-    }
-    public int getUserId(){
-        return userId;
-    }
-    public void setUserId (int userId){
-        this.userId = userId;
     }
 }

@@ -19,6 +19,9 @@ public interface TransferDao {
 
     Transfer createTransfer(int transferId);
 
+    void save(Transfer transfer);
+
+
 
     //should we put updateAccountAferTransfer into TransferDao or into AccountDao?
    // Transfer updateTransfer();

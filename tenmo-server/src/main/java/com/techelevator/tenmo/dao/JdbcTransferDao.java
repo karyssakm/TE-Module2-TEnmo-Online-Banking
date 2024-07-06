@@ -15,6 +15,7 @@ import java.util.List;
 
 @Component
 public class JdbcTransferDao implements TransferDao {
+
     private final JdbcTemplate jdbcTemplate;
 
 
@@ -78,7 +79,7 @@ public class JdbcTransferDao implements TransferDao {
     @Override
     public Transfer sendBucks(TransferDto transferDto) {
         // this is so we make sure the we will not send money to our selfs
-        if (transferDto.getUserFrom() == transferDto.getUserTo()) {
+        if (transferDto.getAccountFrom() == transferDto.getAccountTo()) {
             throw new IllegalArgumentException("Cannot send money to yourself");
         }
 
@@ -92,7 +93,7 @@ public class JdbcTransferDao implements TransferDao {
         String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
                 "VALUES (?, ?, ?, ?, ?)";
         try {
-            jdbcTemplate.update(sql, transferDto.getUserFrom(), transferDto.getUserTo(), transferDto.getAmount());
+            jdbcTemplate.update(sql, transferDto.getAccountFrom(), transferDto.getAccountTo(), transferDto.getAmount());
 
 //            //  this is for when we make sure to subtract from amount
 //            updateBalance(transferDto.getUserFrom(), senderBalance.subtract(transferDto.getAmount()));
@@ -128,7 +129,21 @@ public class JdbcTransferDao implements TransferDao {
 
     @Override
     public Transfer createTransfer(int transferId) {
-        return null;
+        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, " +
+                "account_from, account_to, amount) VALUES (?, ?, ?, ?, ?) RETURNING transfer_id;";
+        try {
+            int newTransferId = jdbcTemplate.queryForObject(sql, new Object[] {
+                    transfer.getTransferTypeId(),
+                    transfer.getTransferStatusId(),
+                    transfer.getAccountFrom(),
+                    transfer.getAccountTo(),
+                    transfer.getAmount()
+            }, Integer.class);
+            transfer.setTransferId(newTransferId);
+        } catch (CannotGetJdbcConnectionException e) {
+            throw new DaoException("Unable to connect to server or database", e);
+        }
+        return transfer;
     }
 
 //    @Override
@@ -154,6 +169,18 @@ public class JdbcTransferDao implements TransferDao {
 
         }
         return transfer;
+    }
+
+    @Override
+    public void save(Transfer transfer) {
+        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
+                "VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql,
+                transfer.getTransferTypeId(),
+                transfer.getTransferStatusId(),
+                transfer.getAccountFrom(),
+                transfer.getAccountTo(),
+                transfer.getAmount());
     }
 
     private Transfer mapRowToTransfer(SqlRowSet rs) {
