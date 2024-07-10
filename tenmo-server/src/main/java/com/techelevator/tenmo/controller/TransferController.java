@@ -21,7 +21,7 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-//@PreAuthorize("isAuthorized()")
+@PreAuthorize("isAuthenticated()")
 public class TransferController {
 
     private final TransferDao transferDao;
@@ -33,18 +33,27 @@ public class TransferController {
         this.accountDao = accountDao;
         this.userDao = userDao;
     }
+    @PreAuthorize("permitAll()")
     @RequestMapping(path = "/transfers", method = RequestMethod.GET)
-    public ResponseEntity<List<Transfer>> getAllPastTransfers() {
-        List<Transfer> pastTransfers = transferDao.getAllPastTransfers();
-        return ResponseEntity.ok(pastTransfers);
-    }
-    @RequestMapping(path = "/transfer/pending", method = RequestMethod.GET)
-    public ResponseEntity<List<Transfer>> getAllPendingRequests() {
-        List<Transfer> pendingRequests = transferDao.getAllPendingRequests();
-        return ResponseEntity.ok(pendingRequests);
+    public List<Transfer> list() {
+        return transferDao.getAllPastTransfers();
     }
 
-    @RequestMapping(path = "/transfer/send", method = RequestMethod.POST)
+    @PreAuthorize("permitAll()")
+    @RequestMapping(path = "/transfer/pending/{userId}", method = RequestMethod.GET)
+    public List<Transfer> getPendingRequest(@PathVariable int userId) {
+
+        List<Transfer> pendingTransfer = null;
+        try {
+            pendingTransfer = transferDao.getAllPendingRequests( userId);
+        } catch (CannotGetJdbcConnectionException e) {
+            throw new DaoException("Unable to connect to server or database", e);
+        }
+        return pendingTransfer;
+    }
+   // @ResponseStatus(HttpStatus.CREATED)
+   @PreAuthorize("permitAll()")
+    @PostMapping(path = "/transfer/send")
     public ResponseEntity<String> sendBucks(@RequestBody TransferDto transferDto) {
         try {
             Transfer newTransfer = transferDao.sendBucks(transferDto);
@@ -53,7 +62,16 @@ public class TransferController {
             throw new DaoException("Unable to connect to server or database", e);
         }
     }
-
+    @PreAuthorize("permitAll()")
+    @RequestMapping(path = "/transfer/{transferId}", method = RequestMethod.GET)
+    public ResponseEntity<Transfer> getTransferById(@PathVariable int transferId) {
+        Transfer transfer = transferDao.getTransferByTransferId(transferId);
+        if (transfer != null) {
+            return ResponseEntity.ok(transfer);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 
 
     //Add method to getAllTransfers (list)

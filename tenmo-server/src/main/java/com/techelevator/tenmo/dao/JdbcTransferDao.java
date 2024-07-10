@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,10 +23,11 @@ public class JdbcTransferDao implements TransferDao {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @Override    //getAllTransfers
+
+    @Override
     public List<Transfer> getAllPastTransfers() {
         List<Transfer> transfers = new ArrayList<>();
-        String sql = "SELECT * FROM transfer;";
+        String sql = "SELECT * FROM transfer";
         try {
             SqlRowSet results = jdbcTemplate.queryForRowSet(sql);
             while (results.next()) {
@@ -37,43 +39,30 @@ public class JdbcTransferDao implements TransferDao {
         }
         return transfers;
     }
+
     @Override
-    public List<Transfer> getAllPendingRequests() {
+    public List<Transfer> getAllPendingRequests(int userId) {
         List<Transfer> pendingRequests = new ArrayList<>();
-        String sql = "SELECT *" +
-                "FROM transfer_status ts" +
-                "JOIN transfer t ON ts.transfer_status  = ts.transfer_status" +
-                "WHERE transfer_status = = ?";
+        String sql = "SELECT t.transfer_id, t.transfer_type_id, t.account_from, t.account_to, t.transfer_status_id, t.amount " +
+                "FROM transfer t " +
+                "JOIN account a ON t.account_from = a.account_id OR t.account_to = a.account_id " +
+                "WHERE a.user_id = ? AND t.transfer_status_id = 1";
+
         try {
-            SqlRowSet results = jdbcTemplate.queryForRowSet(sql);
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql, userId);
             while (results.next()) {
                 Transfer transfer = mapRowToTransfer(results);
-//                TransferStatus.setTransferStatus(new TransferStatus(
-//                        results.getInt("transfer_status_id"),
-//                        results.getString("transfer_status_desc")
-//                ));
                 pendingRequests.add(transfer);
             }
         } catch (DataAccessException e) {
-            throw new DaoException("Error retrieving pending  requests", e);
+            throw new DaoException("Error retrieving pending requests", e);
         }
+
         return pendingRequests;
+
     }
 
-//
-//    @Override
-//    public Transfer sendBucks(int accountFrom, int accountTo, BigDecimal amount) {
-//        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
-//                "VALUES (?, ?, ?, ?, ?)";
-//        try {
-//            // Assuming transfer type for SEND is 1 and transfer status for PENDING is 1 (you may adjust based on your schema)
-//            jdbcTemplate.update(sql, TransferStatus.TRANSFER_STATUS_PENDING, accountFrom, accountTo, amount);
-//
-//        } catch (DataAccessException e) {
-//            throw new DaoException("Error sending TE Bucks", e);
-//        }
-//        return
-//    }
+
 
     @Override
     public Transfer sendBucks(TransferDto transferDto) {
@@ -81,14 +70,11 @@ public class JdbcTransferDao implements TransferDao {
         if (transferDto.getAccountFrom() == transferDto.getAccountTo()) {
             throw new IllegalArgumentException("Cannot send money to yourself");
         }
-
-        // we have to make sure that we have enough money
+       //  we have to make sure that we have enough money
 //        BigDecimal senderBalance = getBalanceByUserId(transferDto.getUserFrom());
 //        if (senderBalance.compareTo(transferDto.getAmount()) < 0) {
 //            throw new IllegalArgumentException("Insufficient balance");
 //        }
-
-
         String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
                 "VALUES (?, ?, ?, ?, ?)";
         try {
@@ -114,7 +100,7 @@ public class JdbcTransferDao implements TransferDao {
 //        jdbcTemplate.update(sql, newBalance, userId);
 //    }
 
-   
+
 
 
 
@@ -154,9 +140,7 @@ public class JdbcTransferDao implements TransferDao {
     @Override
     public Transfer getTransferByTransferId(int transferId) {
         Transfer transfer = null;
-        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, " +
-                "account_from, account_to, amount FROM transfer WHERE " +
-                "transfer_id = ?;";
+        String sql = " SELECT * FROM transfer WHERE transfer_id = ?";
         try {
             SqlRowSet results = jdbcTemplate.queryForRowSet(sql, transferId);
             if (results.next()) {

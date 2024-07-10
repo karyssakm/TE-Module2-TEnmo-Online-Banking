@@ -1,12 +1,11 @@
 package com.techelevator.tenmo;
 
-import com.techelevator.tenmo.dao.AccountDao;
-import com.techelevator.tenmo.model.Account;
-import com.techelevator.tenmo.model.AuthenticatedUser;
-import com.techelevator.tenmo.model.UserCredentials;
+
+import com.techelevator.tenmo.model.*;
 import com.techelevator.tenmo.services.AccountService;
 import com.techelevator.tenmo.services.AuthenticationService;
 import com.techelevator.tenmo.services.ConsoleService;
+import com.techelevator.tenmo.services.TransferService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,7 +17,9 @@ public class App {
 
     private final ConsoleService consoleService = new ConsoleService();
     private final AuthenticationService authenticationService = new AuthenticationService(API_BASE_URL);
-    private final AccountService accountService= new AccountService(API_BASE_URL);
+    private final AccountService accountService = new AccountService(API_BASE_URL);
+    private final TransferService transferService = new TransferService(API_BASE_URL);
+
     private AuthenticatedUser currentUser;
 
     public static void main(String[] args) {
@@ -83,7 +84,9 @@ public class App {
                 sendBucks();
             } else if (menuSelection == 5) {
                 requestBucks();
-            } else if (menuSelection == 0) {
+            }else if (menuSelection == 6) {
+                transferByTransferId();
+            }else if (menuSelection == 0) {
                 continue;
             } else {
                 System.out.println("Invalid Selection");
@@ -100,21 +103,88 @@ public class App {
             System.out.println("User not authenticated.");
         }
     }
+    private void transferByTransferId(){
+        if (currentUser != null) {
+            int transferId = consoleService.promptForTransferId(); // Implement this method in ConsoleService to prompt for transfer ID
+            Transfer transfer = transferService.getTransferByTransferId();
+            if (transfer != null) {
+                System.out.println("Transfer Details:");
+                System.out.println("Transfer ID: " + transfer.getTransferId());
+                System.out.println("Amount: $" + transfer.getAmount());
+                System.out.println("From: " + transfer.getAccountFrom());
+                System.out.println("To: " + transfer.getAccountTo());
+
+            } else {
+                System.out.println("Transfer not found or you do not have access to this transfer.");
+            }
+        } else {
+            System.out.println("User not authenticated.");
+        }
+    }
 
 	private void viewTransferHistory() {
-		// TODO Auto-generated method stub
-		
+
+        if (currentUser != null) {
+            Transfer[] transfers = transferService.getAllPastTransfers();
+            if (transfers != null && transfers.length > 0) {
+                System.out.println("------- Transfer History -------");
+                System.out.println("ID :        From/To           Amount   " );
+                System.out.println("--------------------------------");
+
+                for(Transfer transfer: transfers) {
+                    //Transfer transferred = transferService.getTransferByTransferId();
+                    System.out.println(transfer.getTransferId(),transfer.getAccountFrom(),transfer.getAccountTo(), transfer.getAmount());
+//                    System.out.println("Transfers");
+//                    System.out.println("Amount: $" + transfer.getAmount());
+//                    System.out.println("From: " + transfer.getAccountFrom());
+//                    System.out.println("To: " + transfer.getAccountTo());
+//                    System.out.println("ID : " + transfer.getTransferId());
+//                    System.out.println("--------------------------------");
+                }
+            } else {
+                System.out.println("No transfers found.");
+            }
+        } else {
+            System.out.println("User not authenticated.");
+        }
 	}
 
 	private void viewPendingRequests() {
-		// TODO Auto-generated method stub
-		
+        if (currentUser != null) {
+            Transfer[] pendingRequests = transferService.getAllPendingRequests();
+            if (pendingRequests != null && pendingRequests.length > 0) {
+                System.out.println("Pending Transfer Requests:");
+                for (Transfer transfer : pendingRequests) {
+                    System.out.println(transfer);
+                }
+            } else {
+                System.out.println("No pending transfer requests found.");
+            }
+        } else {
+            System.out.println("User not authenticated.");
+        }
 	}
 
 	private void sendBucks() {
-		// TODO Auto-generated method stub
-		
+        if (currentUser != null) {
+
+            TransferDto transferDto = new TransferDto();
+            transferDto.setAccountFrom(currentUser.getUser().getId());
+            transferDto.setAccountTo(consoleService.promptForRecipientAccount());
+            transferDto.setAmount(consoleService.promptForAmount());
+
+            Transfer responseTransfer = transferService.sendBucks(transferDto);
+            if (responseTransfer != null) {
+                System.out.println("Transfer successful:");
+                System.out.println(responseTransfer);
+            } else {
+                System.out.println("Failed to send bucks.");
+            }
+        } else {
+            System.out.println("User not authenticated.");
+        }
 	}
+
 
 	private void requestBucks() {
 		// TODO Auto-generated method stub

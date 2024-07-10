@@ -9,7 +9,7 @@ public interface TransferDao {
 
     List<Transfer> getAllPastTransfers();
 
-    List<Transfer> getAllPendingRequests();
+    List<Transfer> getAllPendingRequests(int userId);
 
     Transfer sendBucks(TransferDto transferDto);
 
@@ -18,14 +18,13 @@ public interface TransferDao {
     Transfer createTransfer(Transfer transferId);
 
     void save(Transfer transfer);
-
+    Transfer getTransferByTransferId(int transferId);
 
 
     //should we put updateAccountAferTransfer into TransferDao or into AccountDao?
    // Transfer updateTransfer();
 
 
-    Transfer getTransferByTransferId(int transferId);
 }
 
 
@@ -41,7 +40,5 @@ public interface TransferDao {
 
 
 
-//Transfer getTransferById(int transferId);
 
-///List<Transfer> getTransfersByAccountId(int accountId);
 

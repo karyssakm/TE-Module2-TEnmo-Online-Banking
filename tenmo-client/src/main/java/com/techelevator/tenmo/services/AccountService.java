@@ -1,8 +1,6 @@
 package com.techelevator.tenmo.services;
 
-import com.techelevator.tenmo.dao.AccountDao;
-import com.techelevator.tenmo.dao.JdbcAccountDao;
-import com.techelevator.tenmo.exception.DaoException;
+
 import com.techelevator.tenmo.model.Account;
 import com.techelevator.util.BasicLogger;
 import org.springframework.beans.factory.annotation.Autowired;

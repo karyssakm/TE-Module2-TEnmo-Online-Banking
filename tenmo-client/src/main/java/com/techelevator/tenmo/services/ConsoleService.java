@@ -1,6 +1,8 @@
 package com.techelevator.tenmo.services;
 
 
+
+import com.techelevator.tenmo.model.Transfer;
 import com.techelevator.tenmo.model.UserCredentials;
 
 import java.math.BigDecimal;
@@ -8,8 +10,44 @@ import java.util.Scanner;
 
 public class ConsoleService {
 
-    private final Scanner scanner = new Scanner(System.in);
+    private Scanner scanner = new Scanner(System.in);
+    public ConsoleService() {
+        this.scanner = new Scanner(System.in);
+    }
 
+
+    public int promptForRecipientAccount() {
+        System.out.print("Enter recipient's account number: ");
+        return scanner.nextInt();
+    }
+    public BigDecimal promptForAmount() {
+        System.out.print("Enter amount to transfer: $");
+        return scanner.nextBigDecimal();
+    }
+    public int promptForTransferId() {
+        System.out.print("Enter transfer ID: ");
+        while (true) {
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid input. Enter a valid transfer ID: ");
+            }
+        }
+    }
+
+    public void printTransferHistory(Transfer[] transfers) {
+        if (transfers != null && transfers.length > 0) {
+            System.out.println("------- Transfer History -------");
+            for (Transfer transfer : transfers) {
+                System.out.println("Amount: $" + transfer.getAmount());
+                System.out.println("From: " + transfer.getAccountFrom());
+                System.out.println("To: " + transfer.getAccountTo());
+                System.out.println("--------------------------------");
+            }
+        } else {
+            System.out.println("No transfers found.");
+        }
+    }
     public int promptForMenuSelection(String prompt) {
         int menuSelection;
         System.out.print(prompt);
@@ -42,6 +80,7 @@ public class ConsoleService {
         System.out.println("3: View your pending requests");
         System.out.println("4: Send TE bucks");
         System.out.println("5: Request TE bucks");
+
         System.out.println("0: Exit");
         System.out.println();
     }
