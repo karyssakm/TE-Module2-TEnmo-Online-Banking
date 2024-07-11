@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+
 @Component
 public class JdbcAccountDao implements AccountDao {
 
@@ -42,7 +43,7 @@ public class JdbcAccountDao implements AccountDao {
     @Override
     public Account getAccountById(int accountId) {
         Account accounts = new Account();
-        String sql = "SELECT * FROM account WHERE account_id = ?";
+        String sql = "SELECT account_id, user_id, balance FROM account WHERE account_id = ?";
         try {
             SqlRowSet results = jdbcTemplate.queryForRowSet(sql, accountId);
             if (results.next()) {
@@ -53,10 +54,11 @@ public class JdbcAccountDao implements AccountDao {
         }
         return accounts;
     }
+
     @Override
     public Account getAccountByUserId(int userId){
         Account accounts = new Account();
-        String sql = "SELECT * FROM account WHERE user_id = ?";
+        String sql = "SELECT account_id, user_id, balance FROM account WHERE user_id = ?";
         try {
             SqlRowSet results = jdbcTemplate.queryForRowSet(sql, userId);
             if (results.next()) {
@@ -67,6 +69,8 @@ public class JdbcAccountDao implements AccountDao {
         }
         return  accounts;
     }
+
+
     @Override
     public BigDecimal getBalanceByUserId(int userId) {
         String sql = "SELECT balance FROM account WHERE user_id = ?";
@@ -90,18 +94,30 @@ public class JdbcAccountDao implements AccountDao {
         return count != null && count > 0;
     }
 
+
     @Override
-    public void update(Account account) {
+    public Account updateBalance(Account account) {
         String sql = "UPDATE account SET balance = ? WHERE account_id = ?";
-        jdbcTemplate.update(sql, account.getBalance(), account.getAccountId());
+        try {
+            int numberOfRows = jdbcTemplate.update(sql, account.getBalance(), account.getAccountId());
+            if (numberOfRows == 0) {
+                throw new DaoException("Zero rows affected, expected at least one.");
+            }
+            return getAccountById(account.getAccountId());
+        } catch (DataAccessException e) {
+            throw new DaoException("Error updating balance for account ID: " + account.getAccountId(), e);
+        }
     }
 
 
-    //not going to correctly update
     @Override
-    public void updateBalance(int accountId, BigDecimal amount) {
-        String sql = "UPDATE account SET balance = balance + ? WHERE account_id = ?";
-        jdbcTemplate.update(sql, amount, accountId);
+    public Account findByAccountId(int accountId) {
+        String sql = "SELECT account_id, user_id, balance FROM account WHERE account_id = ?";
+        SqlRowSet results = jdbcTemplate.queryForRowSet(sql, accountId);
+        if (results.next()) {
+            return mapRowToAccount(results);
+        }
+        return null;
     }
 
     private Account mapRowToAccount(SqlRowSet rs) {

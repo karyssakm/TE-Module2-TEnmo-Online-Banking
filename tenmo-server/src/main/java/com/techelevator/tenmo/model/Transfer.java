@@ -10,15 +10,6 @@ public class Transfer {
     private int accountTo;
     private BigDecimal amount;
 
-    public Transfer(int transferId, int transferTypeId,int transferStatusId, int accountFrom, int accountTo,
-                    BigDecimal amount) {
-        this.transferId = transferId;
-        this.transferTypeId = transferTypeId;
-        this.transferStatusId=  transferStatusId;
-        this.accountFrom = accountFrom;
-        this.accountTo = accountTo;
-        this.amount =amount;
-    }
 
     public boolean isApproved() {
         return transferStatusId == 2; // 2 is approved

@@ -26,7 +26,7 @@ public class Account {
     }
 
     public BigDecimal getBalance() {
-        return balance;
+        return balance != null ? balance : BigDecimal.ZERO;
     }
 
     public void setAccountId(int accountId) {

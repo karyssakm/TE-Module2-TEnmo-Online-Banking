@@ -15,18 +15,23 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 
 public class AccountService {
-  //  private static final String API_BASE_URL=  "http://localhost:8080/";
-    private static final RestTemplate restTemplate = new RestTemplate();
-    private final String API_BASE_URL;
-    private static String authToken = null;
-    // private AccountDao accountDao;
 
-    public void setAuthToken(String authToken){
+    private final RestTemplate restTemplate;
+    private final String API_BASE_URL;
+    private String authToken = null;
+
+
+
+    public AccountService(String apiUrl, RestTemplate restTemplate) {
+        this.API_BASE_URL = apiUrl;
+        this.restTemplate = restTemplate;
+    }
+
+    public void setAuthToken(String authToken) {
         this.authToken = authToken;
     }
-    public AccountService(String apiUrl){
-        this.API_BASE_URL = apiUrl;
-    }
+
+
     public Account[] getAllAccount(int userid){
         Account[] accounts = new Account[]{new Account()};
         try{
@@ -38,18 +43,47 @@ public class AccountService {
         }
         return accounts;
     }
-    public Account getAccountById(int accountId){
-        Account account= new Account();
-        try{
-            HttpEntity<Void> entity = createAuthEntity();
-            ResponseEntity<Account> response = restTemplate.exchange(API_BASE_URL+ "accountId/" +accountId,HttpMethod.GET, entity, Account.class);
+
+
+    public Account[] getAllAccounts() {
+        Account[] accounts = null;
+        try {
+            ResponseEntity<Account[]> response = restTemplate.exchange(
+                    API_BASE_URL + "/accounts", HttpMethod.GET, makeAuthEntity(), Account[].class);
+            accounts = response.getBody();
+        } catch (RestClientResponseException e) {
+            BasicLogger.log(e.getMessage());
+        }
+        return accounts;
+    }
+
+
+
+    public Account getAccountByUserId(int userId) {
+        Account account = null;
+        try {
+            ResponseEntity<Account> response = restTemplate.exchange(API_BASE_URL + "/account/" + userId, HttpMethod.GET, makeAuthEntity(), Account.class);
             account = response.getBody();
-        }catch (RestClientResponseException  e){
+        } catch (RestClientResponseException e) {
             BasicLogger.log(e.getMessage());
         }
         return account;
-
     }
+
+
+    public Account getAccountById(int accountId) {
+        Account account = null;
+        try {
+            ResponseEntity<Account> response = restTemplate.exchange(
+                    API_BASE_URL + "/account/" + accountId, HttpMethod.GET, makeAuthEntity(), Account.class);
+            account = response.getBody();
+        } catch (RestClientResponseException e) {
+            BasicLogger.log(e.getMessage());
+        }
+        return account;
+    }
+
+
 
     public  BigDecimal getBalanceByUserId(int userId) {
         BigDecimal balance = null;
@@ -57,7 +91,6 @@ public class AccountService {
             HttpEntity<Void> entity = createAuthEntity();
             ResponseEntity<BigDecimal> response = restTemplate.exchange(API_BASE_URL + "/account/{userId}/balance", HttpMethod.GET, entity, BigDecimal.class, userId);
             balance = response.getBody();
-//            BasicLogger.log("Your current balance is: " + balance);
         } catch (Exception e) {
             BasicLogger.log("Error fetching balance: " + e.getMessage());
         }
@@ -65,13 +98,55 @@ public class AccountService {
     }
 
 
+    public BigDecimal getBalanceByAccountId(int accountId) {
+        BigDecimal balance = null;
+        try {
+            ResponseEntity<BigDecimal> response = restTemplate.exchange(
+                    API_BASE_URL + "/account/" + accountId + "/balance", HttpMethod.GET, makeAuthEntity(), BigDecimal.class);
+            balance = response.getBody();
+        } catch (RestClientResponseException e) {
+            BasicLogger.log(e.getMessage());
+        }
+        return balance;
+    }
 
 
-    private static HttpEntity<Void> createAuthEntity() {
+    public void updateAccount(Account account) {
+        try {
+            String url = API_BASE_URL + "/account/" + account.getUserId() + "/balance";
+            HttpEntity<BigDecimal> entity = makeAuthEntityWithAmount(account.getBalance());
+            restTemplate.exchange(url, HttpMethod.PUT, entity, Account.class);
+        } catch (RestClientResponseException | ResourceAccessException e) {
+            BasicLogger.log("Update account request failed: " + e.getMessage());
+        }
+    }
+
+
+
+
+
+
+
+    private HttpEntity<Void> createAuthEntity() {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(authToken);
         return new HttpEntity<>(headers);
     }
+
+
+    private HttpEntity<Void> makeAuthEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(authToken);
+        return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<BigDecimal> makeAuthEntityWithAmount(BigDecimal amount) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(authToken);
+        return new HttpEntity<>(amount, headers);
+    }
+
 
 
 }

@@ -4,6 +4,7 @@ import com.techelevator.tenmo.exception.DaoException;
 import com.techelevator.tenmo.model.Transfer;
 import com.techelevator.tenmo.model.TransferDto;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
@@ -17,28 +18,97 @@ import java.util.List;
 public class JdbcTransferDao implements TransferDao {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AccountDao accountDao;
 
 
-    private JdbcTransferDao(JdbcTemplate jdbcTemplate) {
+
+    public JdbcTransferDao(JdbcTemplate jdbcTemplate, AccountDao accountDao) {
         this.jdbcTemplate = jdbcTemplate;
+        this.accountDao = accountDao;
+    }
+
+
+    @Override    //getAllTransfers
+    public List<Transfer> getAllPastTransfers() {
+        List<Transfer> pastTransfers = new ArrayList<>();
+        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, account_from, account_to, amount FROM transfer;";
+        try {
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql);
+            while (results.next()) {
+                pastTransfers.add(mapRowToTransfer(results));
+            }
+        } catch (CannotGetJdbcConnectionException e) {
+            throw new DaoException("Unable to connect to server or database", e);
+        } catch (DataIntegrityViolationException e) {
+            throw new DaoException("Data integrity violation", e);
+        }
+        return pastTransfers;
     }
 
 
     @Override
-    public List<Transfer> getAllPastTransfers() {
-        List<Transfer> transfers = new ArrayList<>();
-        String sql = "SELECT * FROM transfer";
+    public List<Transfer> getTransfersByAccountId(int accountId) {
+        List<Transfer> transferByAccountId = new ArrayList<>();
+        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, account_from, account_to, amount " +
+                "FROM transfer WHERE account_from = ? OR account_to = ?";
         try {
-            SqlRowSet results = jdbcTemplate.queryForRowSet(sql);
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql, accountId, accountId);
             while (results.next()) {
                 Transfer transfer = mapRowToTransfer(results);
-                transfers.add(transfer);
+                transferByAccountId.add(transfer);
+            }
+        } catch (DataAccessException e) {
+            throw new DaoException("Error accessing data from database", e);
+
+        }
+        return transferByAccountId;
+    }
+
+
+    @Override
+    public List<Transfer> getPendingTransfersByUserId(int userId) {
+        List<Transfer> pendingTransfers = new ArrayList<>();
+        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, account_from, account_to, amount " +
+                "FROM transfer WHERE (account_from IN (SELECT account_id FROM account WHERE user_id = ?) " +
+                "OR account_to IN (SELECT account_id FROM account WHERE user_id = ?)) " +
+                "AND transfer_status_id = 1";
+        try {
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql, userId);
+            while (results.next()) {
+                pendingTransfers.add(mapRowToTransfer(results));
             }
         } catch (DataAccessException e) {
             throw new DaoException("Error accessing data from database", e);
         }
-        return transfers;
+        return pendingTransfers;
     }
+
+
+    @Override
+    public List<Transfer> getCurrentPendingTransfersByUserId(int userId) {
+        List<Transfer> currentPendingTransfers = new ArrayList<>();
+        String sql = "SELECT t.transfer_id, t.transfer_type_id, t.transfer_status_id, t.account_from, t.account_to, t.amount " +
+                "FROM transfer t " +
+                "JOIN account a ON t.account_from = a.account_id OR t.account_to = a.account_id " +
+                "WHERE a.user_id = ? AND t.transfer_status_id = 1";
+        try {
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql, userId);
+            while (results.next()) {
+                Transfer transfer = mapRowToTransfer(results);
+                currentPendingTransfers.add(transfer);
+            }
+        } catch (DataAccessException e) {
+            throw new DaoException("Error accessing data from database", e);
+
+        }
+        return currentPendingTransfers;
+    }
+
+
+
+
+
+
 
     @Override
     public List<Transfer> getAllPendingRequests(int userId) {
@@ -63,108 +133,146 @@ public class JdbcTransferDao implements TransferDao {
     }
 
 
-
     @Override
-    public Transfer sendBucks(TransferDto transferDto) {
-        // this is so we make sure the we will not send money to our selfs
-        if (transferDto.getAccountFrom() == transferDto.getAccountTo()) {
-            throw new IllegalArgumentException("Cannot send money to yourself");
-        }
-       //  we have to make sure that we have enough money
-//        BigDecimal senderBalance = getBalanceByUserId(transferDto.getUserFrom());
-//        if (senderBalance.compareTo(transferDto.getAmount()) < 0) {
-//            throw new IllegalArgumentException("Insufficient balance");
-//        }
+    public Transfer sendBucks(Transfer transfer) {
         String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
                 "VALUES (?, ?, ?, ?, ?)";
         try {
-            jdbcTemplate.update(sql, transferDto.getAccountFrom(), transferDto.getAccountTo(), transferDto.getAmount());
+            jdbcTemplate.update(sql,
+                    transfer.getTransferTypeId(),
+                    transfer.getTransferStatusId(),
+                    transfer.getAccountFrom(),
+                    transfer.getAccountTo(),
+                    transfer.getAmount());
 
-//            //  this is for when we make sure to subtract from amount
-//            updateBalance(transferDto.getUserFrom(), senderBalance.subtract(transferDto.getAmount()));
-//
-//            //  this is to add to the balance
-//            BigDecimal receiverBalance = getBalanceByUserId(transferDto.getUserTo());
-//            updateBalance(transferDto.getUserTo(), receiverBalance.add(transferDto.getAmount()));
-
-            // this is what gets and returns the newly created transfer
-            int transferId = jdbcTemplate.queryForObject(sql,Integer.class);
-            return getTransferByTransferId(transferId);
+            updateAccountBalances(transfer);
         } catch (DataAccessException e) {
             throw new DaoException("Error sending TE Bucks", e);
         }
+        return transfer;
     }
-
-//    private void updateBalance(int userId, BigDecimal newBalance) {
-//        String sql = "UPDATE account SET balance = ? WHERE user_id = ?";
-//        jdbcTemplate.update(sql, newBalance, userId);
-//    }
-
-
-
-
-
-
 
 
     @Override
-    public Transfer requestBucks(int accountFrom) {
+    public Transfer findByAccountId(int accountId) {
+        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, account_from, account_to, amount " +
+                "FROM transfer WHERE account_from = ? OR account_to = ?";
+        try {
+            SqlRowSet results = jdbcTemplate.queryForRowSet(sql, accountId, accountId);
+            if (results.next()) {
+                return mapRowToTransfer(results);
+            }
+        } catch (CannotGetJdbcConnectionException e) {
+            throw new DaoException("Unable to connect to server or database", e);
+        } catch (DataAccessException e) {
+            throw new DaoException("Error retrieving transfer by account ID", e);
+        }
         return null;
     }
 
-    @Override
-    public Transfer createTransfer(Transfer transferId) {
-        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, " +
-                "account_from, account_to, amount) VALUES (?, ?, ?, ?, ?) RETURNING transfer_id;";
-        try {
-            int newTransferId = jdbcTemplate.queryForObject(sql, new Object[] {
-                    transferId.getTransferTypeId(),
-                    transferId.getTransferStatusId(),
-                    transferId.getAccountFrom(),
-                    transferId.getAccountTo(),
-                    transferId.getAmount()
-            }, Integer.class);
-            transferId.setTransferId(newTransferId);
-        } catch (CannotGetJdbcConnectionException e) {
-            throw new DaoException("Unable to connect to server or database", e);
-        }
-        return transferId;
-    }
 
-//    @Override
-//    public Transfer updateTransfer() {
-//        return null;
-//    }
+
+
+
+    @Override
+    public Transfer createTransfer(Transfer transfer) {
+        Transfer newTransfer = null;
+
+        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
+                "VALUES (?, ?, ?, ?, ?) RETURNING transfer_id";
+        try {
+            int newTransferId = jdbcTemplate.queryForObject(sql, int.class, transfer.getTransferTypeId(), transfer.getTransferStatusId(), transfer.getAccountFrom(), transfer.getAccountTo(), transfer.getAmount());
+            newTransfer = getTransferByTransferId(newTransferId);
+        } catch (DataAccessException e) {
+            throw new DaoException("Error creating transfer", e);
+        }
+        return newTransfer;
+    }
 
 
     @Override
     public Transfer getTransferByTransferId(int transferId) {
-        Transfer transfer = null;
-        String sql = " SELECT * FROM transfer WHERE transfer_id = ?";
+        Transfer transferByTransferId = null;
+        String sql = "SELECT transfer_id, transfer_type_id, transfer_status_id, " +
+                "account_from, account_to, amount FROM transfer WHERE " +
+                "transfer_id = ?;";
         try {
             SqlRowSet results = jdbcTemplate.queryForRowSet(sql, transferId);
             if (results.next()) {
-                transfer = mapRowToTransfer(results);
+                transferByTransferId = mapRowToTransfer(results);
             }
         } catch (CannotGetJdbcConnectionException e) {
             throw new DaoException("Unable to connect to server or database", e);
 
 
         }
+        return transferByTransferId;
+    }
+
+
+    @Override
+    public Transfer requestBucks(Transfer transfer) {
+        String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
+                "VALUES (?, ?, ?, ?, ?) RETURNING transfer_id";
+        try {
+            Integer newTransferId = jdbcTemplate.queryForObject(sql, Integer.class,
+                    transfer.getTransferTypeId(),
+                    transfer.getTransferStatusId(),
+                    transfer.getAccountFrom(),
+                    transfer.getAccountTo(),
+                    transfer.getAmount());
+            if (newTransferId != null) {
+                transfer.setTransferId(newTransferId);
+            }
+        } catch (DataAccessException e) {
+            throw new DaoException("Error requesting TE Bucks", e);
+        }
         return transfer;
     }
 
+    private void updateAccountBalances(Transfer transfer) {
+        String updateFromAccountSql = "UPDATE account SET balance = balance - ? WHERE account_id = ?";
+        String updateToAccountSql = "UPDATE account SET balance = balance + ? WHERE account_id = ?";
+
+        try {
+            jdbcTemplate.update(updateFromAccountSql, transfer.getAmount(), transfer.getAccountFrom());
+            jdbcTemplate.update(updateToAccountSql, transfer.getAmount(), transfer.getAccountTo());
+        } catch (DataAccessException e) {
+            throw new DaoException("Error updating account balances", e);
+        }
+    }
+
+
+
     @Override
-    public void save(Transfer transfer) {
+    public void updateTransferStatus(Transfer transfer) {
+        String sql = "UPDATE transfer SET transfer_status_id = ? WHERE transfer_id = ?";
+        try {
+            jdbcTemplate.update(sql, transfer.getTransferStatusId(), transfer.getTransferId());
+        } catch (Exception e) {
+            throw new DaoException("Error updating transfer status", e);
+        }
+    }
+
+
+
+    @Override
+    public Transfer save(Transfer transfer) {
         String sql = "INSERT INTO transfer (transfer_type_id, transfer_status_id, account_from, account_to, amount) " +
-                "VALUES (?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql,
+                "VALUES (?, ?, ?, ?, ?) RETURNING transfer_id";
+        Integer newTransferId = jdbcTemplate.queryForObject(sql, Integer.class,
                 transfer.getTransferTypeId(),
                 transfer.getTransferStatusId(),
                 transfer.getAccountFrom(),
                 transfer.getAccountTo(),
                 transfer.getAmount());
+        if (newTransferId != null) {
+            transfer.setTransferId(newTransferId);
+        }
+        return transfer;
     }
+
+
 
     private Transfer mapRowToTransfer(SqlRowSet rs) {
         Transfer transfer = new Transfer();

@@ -2,6 +2,7 @@ package com.techelevator.tenmo.controller;
 
 import com.techelevator.tenmo.dao.AccountDao;
 import com.techelevator.tenmo.dao.JdbcAccountDao;
+import com.techelevator.tenmo.dao.TransferDao;
 import com.techelevator.tenmo.exception.DaoException;
 import com.techelevator.tenmo.model.Account;
 import org.apache.coyote.Request;
@@ -18,10 +19,14 @@ import java.util.List;
 
 public class AccountController {
     private final AccountDao accountDao;
+    private final TransferDao transferDao;
 
-    public AccountController(AccountDao accountDao) {
+
+    public AccountController(AccountDao accountDao, TransferDao transferDao) {
         this.accountDao = accountDao;
+        this.transferDao = transferDao;
     }
+
 
 
     @RequestMapping(path = "/accounts", method = RequestMethod.GET)
@@ -43,6 +48,32 @@ public class AccountController {
     public BigDecimal getBalance(@PathVariable int userId) {
         return accountDao.getBalanceByUserId(userId);
     }
+
+    @RequestMapping(path = "/account/{accountId}/balance", method = RequestMethod.PUT)
+    public ResponseEntity<Account> updateBalance(@PathVariable int accountId, @RequestBody BigDecimal amount) {
+        try {
+            Account account = accountDao.getAccountById(accountId);
+            account.setBalance(account.getBalance().add(amount));
+            Account updatedAccount = accountDao.updateBalance(account);
+            return new ResponseEntity<>(updatedAccount, HttpStatus.OK);
+        } catch (DaoException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to update balance", e);
+        }
+    }
+
+    @RequestMapping(path = "/{accountId}", method = RequestMethod.GET)
+    public ResponseEntity<Account> getAccountById(@PathVariable int accountId) {
+        try {
+            Account account = accountDao.getAccountById(accountId);
+            if (account == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+            return ResponseEntity.ok(account);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error retrieving account", e);
+        }
+    }
+
 
 
 }

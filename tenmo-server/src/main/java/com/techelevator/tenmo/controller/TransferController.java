@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.util.List;
 
@@ -33,11 +34,27 @@ public class TransferController {
         this.accountDao = accountDao;
         this.userDao = userDao;
     }
-    @PreAuthorize("permitAll()")
+
+
     @RequestMapping(path = "/transfers", method = RequestMethod.GET)
-    public List<Transfer> list() {
-        return transferDao.getAllPastTransfers();
+    public List<Transfer> getAllPastTransfers() {
+        List<Transfer> pastTransfers = null;
+        try {
+            pastTransfers = transferDao.getAllPastTransfers();
+        } catch (ResponseStatusException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No past transfers found.");
+        }
+        return pastTransfers;
     }
+
+
+//    //check to what this method is doing
+//    @PreAuthorize("permitAll()")
+//    @RequestMapping(path = "/transfers", method = RequestMethod.GET)
+//    public List<Transfer> list() {
+//        return transferDao.getAllPastTransfers();
+//    }
+
 
     @PreAuthorize("permitAll()")
     @RequestMapping(path = "/transfer/pending/{userId}", method = RequestMethod.GET)
@@ -45,23 +62,34 @@ public class TransferController {
 
         List<Transfer> pendingTransfer = null;
         try {
-            pendingTransfer = transferDao.getAllPendingRequests( userId);
+            pendingTransfer = transferDao.getAllPendingRequests(userId);
         } catch (CannotGetJdbcConnectionException e) {
             throw new DaoException("Unable to connect to server or database", e);
         }
         return pendingTransfer;
     }
+
+
    // @ResponseStatus(HttpStatus.CREATED)
-   @PreAuthorize("permitAll()")
-    @PostMapping(path = "/transfer/send")
-    public ResponseEntity<String> sendBucks(@RequestBody TransferDto transferDto) {
-        try {
-            Transfer newTransfer = transferDao.sendBucks(transferDto);
-            return ResponseEntity.status(HttpStatus.CREATED).body("TE Bucks sent successfully");
-        } catch (CannotGetJdbcConnectionException e) {
-            throw new DaoException("Unable to connect to server or database", e);
-        }
+//   @PreAuthorize("permitAll()")
+//    @PostMapping(path = "/transfer/send")
+//    public ResponseEntity<String> sendBucks(@RequestBody TransferDto transferDto) {
+//        try {
+//            Transfer newTransfer = transferDao.sendBucks(transferDto);
+//            return ResponseEntity.status(HttpStatus.CREATED).body("TE Bucks sent successfully");
+//        } catch (CannotGetJdbcConnectionException e) {
+//            throw new DaoException("Unable to connect to server or database", e);
+//        }
+//    }
+
+    @RequestMapping(path = "/transfer/send", method = RequestMethod.POST)
+    public Transfer sendBucks(@Valid @RequestBody Transfer transfer) {
+        transfer.setTransferTypeId(2); // 2 for send
+        transfer.setTransferStatusId(2); // 2 for approved
+        return createTransfer(transfer);
     }
+
+
     @PreAuthorize("permitAll()")
     @RequestMapping(path = "/transfer/{transferId}", method = RequestMethod.GET)
     public ResponseEntity<Transfer> getTransferById(@PathVariable int transferId) {
@@ -74,79 +102,102 @@ public class TransferController {
     }
 
 
-    //Add method to getAllTransfers (list)
 
-
-    @ResponseStatus(HttpStatus.CREATED)
-    @RequestMapping(path = "/transfer/create", method = RequestMethod.POST)
-    public Transfer createTransfer(@Valid @RequestBody TransferDto transferDto, Principal principal) {
-        Transfer transfer = buildTransferFromTransferDTO(transferDto);
-//        validateAuthorizationToCreate(principal, transfer);
-        if (transfer.getTransferStatusId() == 2) {          //2 is approved
-            transferBucksBetweenAccounts(transfer);     //add in method here to transfer between accounts
-        }
+    @RequestMapping(path = "/transfer/request", method = RequestMethod.POST)
+    public ResponseEntity<Transfer> requestBucks(@Valid @RequestBody Transfer transfer) {
+        Transfer createdTransfer = null;
         try {
-            return transferDao.createTransfer(transfer);
+            validateTransfer(transfer);
+            transfer.setTransferStatusId(1);  //pending
+            createdTransfer = transferDao.createTransfer(transfer);
+            return new ResponseEntity<>(createdTransfer, HttpStatus.CREATED);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to create transfer request", e);
+        }
+    }
+
+
+
+
+    @RequestMapping(path = "/transfer/create", method = RequestMethod.POST)
+    public Transfer createTransfer(@Valid @RequestBody Transfer transfer) {
+        Transfer createTransfer = null;
+        try {
+            createTransfer = transferDao.createTransfer(transfer);
+            if (transfer == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transfer is null.");
+            }
         } catch (DaoException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Transfer fail.");
+        }
+        return createTransfer;
+    }
+
+
+    @RequestMapping(path = "/transfer/approve", method = RequestMethod.POST)
+    public ResponseEntity<Transfer> approveTransfer(@Valid @RequestBody Transfer transfer) {
+        try {
+            Transfer existingTransfer = transferDao.getTransferByTransferId(transfer.getTransferId());
+            if (existingTransfer == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transfer not found.");
+            }
+            transfer.setTransferStatusId(2); // Approved
+            transferDao.updateTransferStatus(existingTransfer); // Updating transferId
+            return new ResponseEntity<>(existingTransfer, HttpStatus.OK);  //200 status is okay
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to approve transfer", e);
         }
     }
 
-    private void transferBucksBetweenAccounts(Transfer transfer) {
-        Account fromAccount = accountDao.getAccountById(transfer.getAccountFrom());
-        Account toAccount = accountDao.getAccountById(transfer.getAccountTo());
 
-        if (fromAccount == null || toAccount == null) {
-            throw new RuntimeException("One or both accounts do not exist");
+
+    @RequestMapping(path = "/transfer/reject", method = RequestMethod.POST)
+    public ResponseEntity<Transfer> rejectTransfer(@Valid @RequestBody Transfer transfer) {
+        try {
+            Transfer existingTransfer = transferDao.getTransferByTransferId(transfer.getTransferId());
+            if (existingTransfer == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transfer not found.");
+            }
+            existingTransfer.setTransferStatusId(3); // rejected
+            transferDao.updateTransferStatus(existingTransfer); // Update transfer status in the database
+            return new ResponseEntity<>(existingTransfer, HttpStatus.OK); // 200 status is okay
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to reject transfer", e);
         }
-
-        if (fromAccount.getBalance().compareTo(transfer.getAmount()) < 0) {
-            throw new RuntimeException("Insufficient balance");
-        }
-
-        fromAccount.setBalance(fromAccount.getBalance().subtract(transfer.getAmount()));
-        toAccount.setBalance(toAccount.getBalance().add(transfer.getAmount()));
-
-        accountDao.update(fromAccount);
-        accountDao.update(toAccount);
     }
 
-    private Transfer buildTransferFromTransferDTO(TransferDto transferDto) {
-        Transfer transfer = new Transfer();
-        transfer.setAccountFrom(transferDto.getAccountFrom());
-        transfer.setAccountTo(transferDto.getAccountTo());
-        transfer.setAmount(transferDto.getAmount());
 
-        if ("Request".equalsIgnoreCase(transferDto.getType())) {
-            transfer.setTransferTypeId(1); // Request
-        } else if ("Send".equalsIgnoreCase(transferDto.getType())) {
-            transfer.setTransferTypeId(2); // Send
-        } else {
-            throw new IllegalArgumentException("Invalid transfer type");
+    private void validateTransfer (Transfer transfer) {
+        if (transfer.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transfer amount must be positive.");
         }
-
-        transfer.setTransferStatusId(1); // Pending
-        return transfer;
+        if (transfer.getAccountFrom() == transfer.getAccountTo()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot transfer to the same account.");
+        }
+        if (!accountDao.existsById(transfer.getAccountFrom()) || !accountDao.existsById(transfer.getAccountTo())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account does not exist.");
+        }
     }
 
-//    private void validateAuthorizationToCreate(Principal principal, Transfer transfer) {
-//        String username = principal.getName();
-//        Account fromAccount = accountDao.existsById(transfer.getAccountFrom());
-//        if (fromAccount == null) {
-//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "From account does not exist.");
+
+
+//private void transferBucksBetweenAccounts(Transfer transfer) {
+//        Account fromAccount = accountDao.getAccountById(transfer.getAccountFrom());
+//        Account toAccount = accountDao.getAccountById(transfer.getAccountTo());
+//
+//        if (fromAccount == null || toAccount == null) {
+//            throw new RuntimeException("One or both accounts do not exist");
 //        }
 //
-//        int ownerId = fromAccount.getUserId();
-//        User user = userDao.getUserByUsername(username);
-//
-//        if (user == null || user.getId() != ownerId) {
-//            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot create this transfer.");
+//        if (fromAccount.getBalance().compareTo(transfer.getAmount()) < 0) {
+//            throw new RuntimeException("Insufficient balance");
 //        }
+//
+//        fromAccount.setBalance(fromAccount.getBalance().subtract(transfer.getAmount()));
+//        toAccount.setBalance(toAccount.getBalance().add(transfer.getAmount()));
+//
+//        accountDao.update(fromAccount);
+//        accountDao.update(toAccount);
 //    }
-
-
-
-
-
 
 }

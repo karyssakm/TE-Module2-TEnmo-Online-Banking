@@ -11,18 +11,27 @@ public interface TransferDao {
 
     List<Transfer> getAllPendingRequests(int userId);
 
-    Transfer sendBucks(TransferDto transferDto);
+    List<Transfer> getPendingTransfersByUserId(int userId);
 
-    Transfer requestBucks(int accountFrom);
+    List<Transfer> getCurrentPendingTransfersByUserId(int userId);
+    List<Transfer> getTransfersByAccountId(int accountId);
 
-    Transfer createTransfer(Transfer transferId);
+    Transfer createTransfer(Transfer transfer);
 
-    void save(Transfer transfer);
     Transfer getTransferByTransferId(int transferId);
 
 
-    //should we put updateAccountAferTransfer into TransferDao or into AccountDao?
-   // Transfer updateTransfer();
+    Transfer sendBucks(Transfer transfer);
+
+    Transfer requestBucks(Transfer transfer);
+
+
+
+    void updateTransferStatus(Transfer transfer);
+
+    Transfer save(Transfer transfer);
+
+    Transfer findByAccountId(int accountId);
 
 
 }
