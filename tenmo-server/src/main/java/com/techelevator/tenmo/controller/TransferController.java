@@ -22,7 +22,6 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-@PreAuthorize("isAuthenticated()")
 public class TransferController {
 
     private final TransferDao transferDao;
@@ -56,7 +55,7 @@ public class TransferController {
 //    }
 
 
-    @PreAuthorize("permitAll()")
+
     @RequestMapping(path = "/transfer/pending/{userId}", method = RequestMethod.GET)
     public List<Transfer> getPendingRequest(@PathVariable int userId) {
 
@@ -70,18 +69,6 @@ public class TransferController {
     }
 
 
-   // @ResponseStatus(HttpStatus.CREATED)
-//   @PreAuthorize("permitAll()")
-//    @PostMapping(path = "/transfer/send")
-//    public ResponseEntity<String> sendBucks(@RequestBody TransferDto transferDto) {
-//        try {
-//            Transfer newTransfer = transferDao.sendBucks(transferDto);
-//            return ResponseEntity.status(HttpStatus.CREATED).body("TE Bucks sent successfully");
-//        } catch (CannotGetJdbcConnectionException e) {
-//            throw new DaoException("Unable to connect to server or database", e);
-//        }
-//    }
-
     @RequestMapping(path = "/transfer/send", method = RequestMethod.POST)
     public Transfer sendBucks(@Valid @RequestBody Transfer transfer) {
         transfer.setTransferTypeId(2); // 2 for send
@@ -90,14 +77,19 @@ public class TransferController {
     }
 
 
-    @PreAuthorize("permitAll()")
+
     @RequestMapping(path = "/transfer/{transferId}", method = RequestMethod.GET)
-    public ResponseEntity<Transfer> getTransferById(@PathVariable int transferId) {
-        Transfer transfer = transferDao.getTransferByTransferId(transferId);
-        if (transfer != null) {
-            return ResponseEntity.ok(transfer);
+    public ResponseEntity<Transfer> getTransferByTransferId(@PathVariable int transferId) {
+        try {
+            Transfer transfer = transferDao.getTransferByTransferId(transferId);
+            if (transfer != null) {
+                return new ResponseEntity<>(HttpStatus.OK);
         } else {
-            return ResponseEntity.notFound().build();
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+
+        } catch (DaoException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to retrieve transfer.");
         }
     }
 
@@ -115,6 +107,11 @@ public class TransferController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to create transfer request", e);
         }
     }
+
+//    @RequestMapping(path = "transfer/{accountId}/", method = RequestMethod.GET)
+//    public Transfer getTransferIdByAccountId(@PathVariable int accountId) {
+//        Transfer transfer = transferDao.getTransferByTransferId();
+//    }
 
 
 

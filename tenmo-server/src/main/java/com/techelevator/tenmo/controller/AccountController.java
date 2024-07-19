@@ -49,17 +49,48 @@ public class AccountController {
         return accountDao.getBalanceByUserId(userId);
     }
 
+
     @RequestMapping(path = "/account/{accountId}/balance", method = RequestMethod.PUT)
     public ResponseEntity<Account> updateBalance(@PathVariable int accountId, @RequestBody BigDecimal amount) {
         try {
             Account account = accountDao.getAccountById(accountId);
-            account.setBalance(account.getBalance().add(amount));
+//            account.setBalance(account.getBalance().add(amount));
+            account.setBalance(amount);
             Account updatedAccount = accountDao.updateBalance(account);
             return new ResponseEntity<>(updatedAccount, HttpStatus.OK);
         } catch (DaoException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to update balance", e);
         }
     }
+
+
+    @RequestMapping(path = "/account/{accountId}/balance/add", method = RequestMethod.PUT)
+    public ResponseEntity<Account> addBalance(@PathVariable int accountId, @RequestBody BigDecimal amount) {
+        try {
+            Account account = accountDao.getAccountById(accountId);
+            account.setBalance(account.getBalance().add(amount));
+//            account.setBalance(amount);
+            accountDao.updateBalance(account);
+            return new ResponseEntity<>(account, HttpStatus.OK);
+        } catch (DaoException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to update balance", e);
+        }
+    }
+
+    @RequestMapping(path = "/account/{accountId}/balance/subtract", method = RequestMethod.PUT)
+    public ResponseEntity<Account> subtractBalance(@PathVariable int accountId, @RequestBody BigDecimal amount) {
+        try {
+            Account account = accountDao.getAccountById(accountId);
+            account.setBalance(account.getBalance().subtract(amount));
+//            account.setBalance(amount);
+            accountDao.updateBalance(account);
+            return new ResponseEntity<>(account, HttpStatus.OK);
+        } catch (DaoException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to update balance", e);
+        }
+    }
+
+
 
     @RequestMapping(path = "/{accountId}", method = RequestMethod.GET)
     public ResponseEntity<Account> getAccountById(@PathVariable int accountId) {
@@ -73,6 +104,8 @@ public class AccountController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error retrieving account", e);
         }
     }
+
+
 
 
 

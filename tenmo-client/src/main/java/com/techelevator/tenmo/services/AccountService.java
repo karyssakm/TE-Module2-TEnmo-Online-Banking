@@ -62,7 +62,7 @@ public class AccountService {
     public Account getAccountByUserId(int userId) {
         Account account = null;
         try {
-            ResponseEntity<Account> response = restTemplate.exchange(API_BASE_URL + "/account/" + userId, HttpMethod.GET, makeAuthEntity(), Account.class);
+            ResponseEntity<Account> response = restTemplate.exchange(API_BASE_URL + "account/" + userId, HttpMethod.GET, makeAuthEntity(), Account.class);
             account = response.getBody();
         } catch (RestClientResponseException e) {
             BasicLogger.log(e.getMessage());
@@ -70,12 +70,25 @@ public class AccountService {
         return account;
     }
 
+//    public Account getAccountByUserId(int userId) {
+//        Account account = BigDecimal.ZERO;
+//        try {
+//            ResponseEntity<Account> response = restTemplate.exchange(API_BASE_URL + "/account/" + userId, HttpMethod.GET, makeAuthEntity(), Account.class);
+//            account = response.getBody();
+//        } catch (RestClientResponseException e) {
+//            BasicLogger.log(e.getMessage());
+//        }
+//        return account;
+//    }
+
 
     public Account getAccountById(int accountId) {
         Account account = null;
         try {
+            String url = API_BASE_URL + accountId;
+            HttpEntity<Void> entity = createAuthEntity();
             ResponseEntity<Account> response = restTemplate.exchange(
-                    API_BASE_URL + "/account/" + accountId, HttpMethod.GET, makeAuthEntity(), Account.class);
+                    url, HttpMethod.GET, makeAuthEntity(), Account.class);
             account = response.getBody();
         } catch (RestClientResponseException e) {
             BasicLogger.log(e.getMessage());
@@ -89,8 +102,10 @@ public class AccountService {
         BigDecimal balance = null;
         try {
             HttpEntity<Void> entity = createAuthEntity();
-            ResponseEntity<BigDecimal> response = restTemplate.exchange(API_BASE_URL + "/account/{userId}/balance", HttpMethod.GET, entity, BigDecimal.class, userId);
-            balance = response.getBody();
+            ResponseEntity<BigDecimal> response = restTemplate.exchange(API_BASE_URL + "account/" + userId + "/balance", HttpMethod.GET, entity, BigDecimal.class, userId);
+            if (response.getStatusCode() == HttpStatus.OK) {
+                balance = response.getBody();
+            }
         } catch (Exception e) {
             BasicLogger.log("Error fetching balance: " + e.getMessage());
         }
@@ -113,11 +128,32 @@ public class AccountService {
 
     public void updateAccount(Account account) {
         try {
-            String url = API_BASE_URL + "/account/" + account.getUserId() + "/balance";
+            String url = API_BASE_URL + "/account/" + account.getAccountId() + "/balance";
             HttpEntity<BigDecimal> entity = makeAuthEntityWithAmount(account.getBalance());
             restTemplate.exchange(url, HttpMethod.PUT, entity, Account.class);
         } catch (RestClientResponseException | ResourceAccessException e) {
             BasicLogger.log("Update account request failed: " + e.getMessage());
+        }
+    }
+
+
+    public void addBalance(int accountId, BigDecimal amount) {
+        try {
+            String url = API_BASE_URL + "/account/" + accountId + "/balance/add";
+            HttpEntity<BigDecimal> entity = makeAuthEntityWithAmount(amount);
+            restTemplate.exchange(url, HttpMethod.PUT, entity, Account.class);
+        } catch (RestClientResponseException | ResourceAccessException e) {
+            BasicLogger.log("Add balance request failed: " + e.getMessage());
+        }
+    }
+//
+    public void subtractBalance(int accountId, BigDecimal amount) {
+        try {
+            String url = API_BASE_URL + "/account/" + accountId + "/balance/subtract";
+            HttpEntity<BigDecimal> entity = makeAuthEntityWithAmount(amount);
+            restTemplate.exchange(url, HttpMethod.PUT, entity, Account.class);
+        } catch (RestClientResponseException | ResourceAccessException e) {
+            BasicLogger.log("Subtract balance request failed: " + e.getMessage());
         }
     }
 

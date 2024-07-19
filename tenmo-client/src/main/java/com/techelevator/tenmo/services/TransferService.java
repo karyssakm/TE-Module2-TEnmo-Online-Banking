@@ -64,22 +64,21 @@ public Transfer[] getAllPendingRequests() {
 }
 
 
-    public Transfer getTransferByTransferId(){
-        Transfer transferid = null;
+    public Transfer getTransferByTransferId(int transferId){
+        Transfer transfer = null;
         try {
 
             ResponseEntity<Transfer> response = restTemplate.exchange(
-                    API_BASE_URL + "transfers",
-//                            + transferId ,
+                    API_BASE_URL + "/transfer/" + transferId,
                     HttpMethod.GET,
                     createAuthEntity(),
                     Transfer.class
             );
-            transferid = response.getBody();
+            transfer = response.getBody();
         } catch (RestClientResponseException e) {
             BasicLogger.log(e.getMessage());
         }
-        return transferid;
+        return transfer;
 
     }
 
